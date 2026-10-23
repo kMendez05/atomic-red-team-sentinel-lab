@@ -1,0 +1,17 @@
+# Secrets and deployment parameters (may contain passwords)
+parameters.json
+*.parameters.json
+.env
+*.env
+*.pfx
+*.pem
+*.key
+*.rdp
+
+# Local tool / OS clutter
+.DS_Store
+.vscode/
+.obsidian/
+
+# Raw exports that may contain IDs or IPs; sanitize before committing
+raw/
