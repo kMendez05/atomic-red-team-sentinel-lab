@@ -2,13 +2,13 @@
 
 **Goal:** confirm the existing Azure lab (Log Analytics workspace + Microsoft Sentinel, Azure for Students credit) was ready for an attack-simulation VM: enough credit, no surprise costs, no Defender onboarding that could raise real alerts, and VM quota available.
 
-**Outcome:** found and removed a leftover threat-intelligence pipeline that was driving **100% of workspace cost** (~$20/month). The fix took three attempts, because each "fixed" state shown by the portal turned out not to be the real state. Every step below was verified against telemetry or the resource itself, not the UI.
+**Outcome:** found and removed a leftover threat-intelligence pipeline that was driving **100% of workspace cost** (\~$20/month). The fix took three attempts, because each "fixed" state shown by the portal turned out not to be the real state. Every step below was verified against telemetry or the resource itself, not the UI.
 
 ---
 
 ## Finding 1: Leftover threat-intel connectors were driving all cost
 
-Billing showed ~$21/month with no VM running, 100% of it Sentinel pay-as-you-go. Sentinel bills per GB ingested, so the question became: *what is ingesting?*
+Billing showed \~$21/month with no VM running, 100% of it Sentinel pay-as-you-go. Sentinel bills per GB ingested, so the question became: *what is ingesting?*
 
 ```kql
 Usage
@@ -18,7 +18,7 @@ Usage
 | sort by GB desc
 ```
 
-**Result:** `ThreatIntelIndicators` 4.15 GB, everything else ~0. A daily breakdown showed ~0.06 GB/day plus ~0.44 GB weekly spikes.
+**Result:** `ThreatIntelIndicators` 4.15 GB, everything else \~0. A daily breakdown showed \~0.06 GB/day plus \~0.44 GB weekly spikes.
 
 ```kql
 ThreatIntelIndicators
@@ -56,7 +56,7 @@ Re-listing returned empty, and ingestion stopped within minutes.
 
 ## Finding 3: Sentinel kept republishing the stored indicators weekly
 
-Ingestion resumed in weekly bursts (~150K rows each), with no connector present. Two hypotheses were tested and disproven (revocation cleanup, then a final in-flight sync) before the cause showed up in the data:
+Ingestion resumed in weekly bursts (\~150K rows each), with no connector present. Two hypotheses were tested and disproven (revocation cleanup, then a final in-flight sync) before the cause showed up in the data:
 
 ```kql
 ThreatIntelIndicators
@@ -64,7 +64,7 @@ ThreatIntelIndicators
 | summarize Rows = count() by LastUpdateMethod, Day = bin(TimeGenerated, 1d)
 ```
 
-**Result:** every row was `LogARepublisher`. Per Microsoft's documentation, Sentinel republishes **all** stored threat intelligence to Log Analytics every 7–10 days, independent of connectors. The store held ~172K indicators with expiry dates out to 2036, so waiting would not fix it (~$7/month).
+**Result:** every row was `LogARepublisher`. Per Microsoft's documentation, Sentinel republishes **all** stored threat intelligence to Log Analytics every 7–10 days, independent of connectors. The store held \~172K indicators with expiry dates out to 2036, so waiting would not fix it (\~$7/month).
 
 **Fix:** an ingestion-time transformation on the table that drops every row before it is stored. On a Sentinel-enabled workspace, transformations into Analytics tables carry no filtering charge.
 

@@ -9,7 +9,7 @@
 | Item | Value |
 |---|---|
 | VM | Windows Server 2022 Datacenter **[smalldisk]**, Gen2, Trusted launch (Secure Boot + vTPM) |
-| Size / region | Standard_B2als_v2 (2 vCPU / 4 GB), ~$0.05/hr |
+| Size / region | Standard_B2als_v2 (2 vCPU / 4 GB), \~$0.05/hr |
 | Disk | 30 GB Standard SSD, deleted with VM |
 | Network | NSG with one custom rule: TCP 3389 from a single `/32`; everything else hits the default `DenyAllInBound` |
 | Shutdown | Automation runbook, nightly, managed identity scoped to this VM only |
@@ -34,7 +34,7 @@ az policy assignment list \
 # -> "Allowed resource deployment regions": 5 regions
 ```
 
-- The portal's size picker then showed the entire B-series unavailable to the subscription in most allowed regions. The cheapest available option there was ~4x the price. One allowed region had **B2als_v2** (same 2 vCPU / 4 GB, current generation), and quota was confirmed before deploying:
+- The portal's size picker then showed the entire B-series unavailable to the subscription in most allowed regions. The cheapest available option there was \~4x the price. One allowed region had **B2als_v2** (same 2 vCPU / 4 GB, current generation), and quota was confirmed before deploying:
 
 ```bash
 az vm list-usage --location <REGION> -o table | grep -iE "BASv2|Total Regional"
