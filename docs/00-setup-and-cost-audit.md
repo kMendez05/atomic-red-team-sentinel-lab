@@ -82,7 +82,7 @@ az monitor data-collection rule show -g <RG> -n <WORKSPACE_TRANSFORM_DCR> \
 # -> "transform": "source | where false" on Microsoft-Table-ThreatIntelIndicators
 ```
 
-*Status: confirmation pending the next republish cycle.*
+*Verified:* the republish arrived every Tuesday through 11/3; the next cycle (11/10) never landed in the table. Nothing stored, nothing billed.
 
 ---
 
