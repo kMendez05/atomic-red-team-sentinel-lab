@@ -1,0 +1,40 @@
+// ART - T1053.005 Suspicious Scheduled Task
+// MITRE ATT&CK: Persistence, Execution / T1053.005 (Scheduled Task)
+// Schedule: every 5 min, lookback 15 min, alert if > 0 results. Severity: Medium
+// Entities: Host=Computer, Account=User, Process=CommandLine+ProcessId
+// Custom details: Signal, TaskRun
+// Two independent signals:
+//   Created  - schtasks /create whose /TR runs a shell/script tool or a user-writable path
+//   Executed - a shell/script tool launched by the Task Scheduler service (svchost -s Schedule)
+// Tuning (from live false positives on an idle Windows Server 2022 VM):
+//   - exact filename match (an unanchored pattern matched Defender's MpCmdRun.exe)
+//   - rundll32 under Task Scheduler only alerts when loading from a user-writable path
+//     (built-in maintenance tasks load System32 DLLs)
+// Known blind spots: task actions that are non-shell binaries in Program Files;
+// tasks created via COM/Register-ScheduledTask are caught only at execution;
+// rundll32 proxying built-in System32 DLLs.
+// Documented exception: Software Inventory Logging (silcollector.cmd, SYSTEM),
+// a built-in Windows Server task.
+// Dedupe: only events ingested since the previous run (frequency 5 min).
+let ShellExe = @"(?i)^(cmd|powershell|pwsh|wscript|cscript|mshta|rundll32|regsvr32)\.exe$";
+let ShellInPath = @"(?i)(^|[\\""])(cmd|powershell|pwsh|wscript|cscript|mshta|rundll32|regsvr32)(\.exe)?([\s""]|$)";
+let UserPaths = @"(?i)\\(appdata|temp|downloads|users\\public|programdata)\\";
+let Created = Sysmon
+| where IngestionTime > ago(5m)
+| where EventID == 1
+| where Image endswith @"\schtasks.exe" or OriginalFileName =~ "schtasks.exe"
+| where CommandLine contains "/create"
+| extend TaskRun = extract(@"(?i)/tr\s+(""[^""]+""|\S+)", 1, CommandLine)
+| where TaskRun matches regex ShellInPath or TaskRun matches regex UserPaths
+| extend Signal = "Task created to run shell/script or user-writable path";
+let Executed = Sysmon
+| where IngestionTime > ago(5m)
+| where EventID == 1
+| where ParentCommandLine contains "-s Schedule"
+| extend Proc = tostring(split(Image, @"\")[-1])
+| where Proc matches regex ShellExe
+| where not(Proc =~ "rundll32.exe" and not(CommandLine matches regex UserPaths))
+| where not(Proc =~ "cmd.exe" and User =~ @"NT AUTHORITY\SYSTEM" and CommandLine contains @"\system32\silcollector.cmd")
+| extend TaskRun = Image, Signal = "Shell/script launched by Task Scheduler";
+union Created, Executed
+| project TimeGenerated, Computer, User, ProcessId, Signal, TaskRun, CommandLine, ParentImage, ParentCommandLine

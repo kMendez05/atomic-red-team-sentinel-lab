@@ -1,0 +1,20 @@
+// ART - T1547.001 Registry Run Key Persistence
+// MITRE ATT&CK: Persistence / T1547.001 (Registry Run Keys / Startup Folder)
+// Schedule: every 5 min, lookback 15 min, alert if > 0 results. Severity: Medium
+// Entities: Host=Computer, Account=User, Process=ProcessId
+// Custom details: Writer, RunKey (TargetObject), RunValue (Details)
+// Logic: Sysmon EID 13 (registry value set) on Run/RunOnce, where the writer is a
+// shell/script/proxy tool OR the value launches something from a user-writable
+// path or via an interpreter. Legit installers writing Program Files paths fall out.
+// Dedupe: only events ingested since the previous run (frequency 5 min).
+// Known blind spots: a signed binary placed under Program Files and registered
+// by a custom installer; other autostart locations (Winlogon, services, startup folder).
+Sysmon
+| where IngestionTime > ago(5m)
+| where EventID == 13
+| where TargetObject has_any (@"\CurrentVersion\Run\", @"\CurrentVersion\RunOnce\")
+| extend Writer = tolower(tostring(split(Image, @"\")[-1]))
+| extend SuspiciousWriter = Writer in ("reg.exe","powershell.exe","pwsh.exe","cmd.exe","wscript.exe","cscript.exe","mshta.exe","rundll32.exe","regsvr32.exe")
+| extend SuspiciousTarget = Details matches regex @"(?i)\\(appdata|temp|downloads|users\\public|programdata)\\|powershell|mshta|wscript|cscript|rundll32|regsvr32"
+| where SuspiciousWriter or SuspiciousTarget
+| project TimeGenerated, Computer, User, ProcessId, Writer, TargetObject, Details, SuspiciousWriter, SuspiciousTarget

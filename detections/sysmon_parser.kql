@@ -1,0 +1,32 @@
+// Sysmon parser — saved in the workspace as function alias `Sysmon`
+// Turns Sysmon events (Event table, collected by Azure Monitor Agent via DCR)
+// into typed columns. Columns are declared explicitly (not bag_unpack) so
+// Sentinel scheduled analytics rules can validate queries that use them.
+Event
+| where Source == "Microsoft-Windows-Sysmon"
+| extend IngestionTime = ingestion_time()   // when the log reached Azure; rules use it to dedupe
+| extend ed = parse_xml(EventData)
+| mv-apply d = ed.DataItem.EventData.Data on (
+    summarize bag = make_bag(bag_pack(tostring(d['@Name']), tostring(d['#text'])))
+  )
+| extend
+    UtcTime           = tostring(bag.UtcTime),
+    RuleName          = tostring(bag.RuleName),
+    ProcessGuid       = tostring(bag.ProcessGuid),
+    ProcessId         = tostring(bag.ProcessId),
+    Image             = tostring(bag.Image),
+    OriginalFileName  = tostring(bag.OriginalFileName),
+    CommandLine       = tostring(bag.CommandLine),
+    CurrentDirectory  = tostring(bag.CurrentDirectory),
+    User              = tostring(bag.User),
+    IntegrityLevel    = tostring(bag.IntegrityLevel),
+    Hashes            = tostring(bag.Hashes),
+    ParentProcessGuid = tostring(bag.ParentProcessGuid),
+    ParentProcessId   = tostring(bag.ParentProcessId),
+    ParentImage       = tostring(bag.ParentImage),
+    ParentCommandLine = tostring(bag.ParentCommandLine),
+    ParentUser        = tostring(bag.ParentUser),
+    EventType         = tostring(bag.EventType),
+    TargetObject      = tostring(bag.TargetObject),
+    Details           = tostring(bag.Details)
+| project-away ed, bag

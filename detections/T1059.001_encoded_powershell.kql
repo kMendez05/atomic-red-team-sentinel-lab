@@ -1,0 +1,21 @@
+// ART - T1059.001 Encoded PowerShell
+// MITRE ATT&CK: Execution / T1059.001 (PowerShell)
+// Schedule: every 5 min, lookback 15 min, alert if > 0 results. Severity: Medium
+// Entities: Host=Computer, Account=User, Process=CommandLine+ProcessId
+// Custom details: DecodedCommand
+// Logic: PowerShell (incl. renamed copies via OriginalFileName) launched with any
+// abbreviation of -EncodedCommand (-e, -ec, -enc, /e …) followed by a 20+ char
+// base64 argument. The payload is decoded (UTF-16LE) for the analyst.
+// Dedupe: only events ingested since the previous run (frequency 5 min); the
+// 15-min lookback still covers ingestion delay, so each event alerts once.
+// Known blind spots: encoded commands passed via stdin or environment variables;
+// obfuscation without -EncodedCommand.
+Sysmon
+| where IngestionTime > ago(5m)
+| where EventID == 1
+| where Image endswith @"\powershell.exe" or Image endswith @"\pwsh.exe"
+    or OriginalFileName in~ ("PowerShell.EXE", "pwsh.dll")
+| extend EncodedBlob = extract(@"(?i)\s[-/]e[a-z]*\s+([A-Za-z0-9+/=]{20,})", 1, CommandLine)
+| where isnotempty(EncodedBlob)
+| extend DecodedCommand = replace_regex(base64_decode_tostring(EncodedBlob), @"\x00", "")
+| project TimeGenerated, Computer, User, ProcessId, ParentImage, ParentCommandLine, CommandLine, DecodedCommand
